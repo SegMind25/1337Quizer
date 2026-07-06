@@ -1,4 +1,3 @@
-```markdown
 # 1337Quizer - 42 Piscine Tester
 
 An interactive web application designed to help 42 Piscine students prepare for their C programming evaluations. It simulates the strict environment of the 42 intranet, featuring Moulinette-style grading, strict rules, and a random problem generator to test your actual coding skills.
@@ -88,5 +87,4 @@ Found a bug or want to add more questions from other modules (like Rushes or BSQ
 5. Open a Pull Request
 
 ---
-**By Bekkali, by SegMind25! Use your brain!!!** 🧠⚡
-```
+```**By Bekkali, by SegMind25! Use your brain!!!** 🧠⚡```
