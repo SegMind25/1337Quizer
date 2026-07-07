@@ -1,19 +1,116 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { modules } from './data.js';
 
+const STORAGE_KEY = '1337quizer_progress';
+
+function loadProgress() {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveProgress(state) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
+function clearProgress() {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+const saved = loadProgress();
+
 export default function App() {
-  const [selectedModule, setSelectedModule] = useState(null);
-  const [view, setView] = useState('dashboard');
-  const [answers, setAnswers] = useState([]);
-  const [currentQ, setCurrentQ] = useState(0);
-  const [score, setScore] = useState(0);
+  const [selectedModule, setSelectedModule] = useState(() => {
+    if (saved && saved.moduleId) {
+      return modules.find(m => m.id === saved.moduleId) || null;
+    }
+    return null;
+  });
+  const [view, setView] = useState(saved?.view || 'dashboard');
+  const [answers, setAnswers] = useState(saved?.answers || []);
+  const [currentQ, setCurrentQ] = useState(saved?.currentQ || 0);
+  const [score, setScore] = useState(saved?.score || 0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [retryMode, setRetryMode] = useState(false);
-  const [retryQuestions, setRetryQuestions] = useState([]);
-  const [retryScore, setRetryScore] = useState(0);
+  const [retryMode, setRetryMode] = useState(saved?.retryMode || false);
+  const [retryQuestions, setRetryQuestions] = useState(saved?.retryQuestions || []);
+  const [retryScore, setRetryScore] = useState(saved?.retryScore || 0);
+  const ignoreUrlSync = useRef(false);
+  const synced = useRef(false);
+
+  useEffect(() => {
+    if (synced.current) return;
+    const path = view === 'dashboard'
+      ? '/'
+      : `/${view}/${selectedModule?.id || ''}`;
+    window.history.replaceState({ view, moduleId: selectedModule?.id }, '', path);
+    synced.current = true;
+  }, [view, selectedModule]);
+
+  useEffect(() => {
+    if (!synced.current) return;
+    if (ignoreUrlSync.current) {
+      ignoreUrlSync.current = false;
+      return;
+    }
+    const path = view === 'dashboard'
+      ? '/'
+      : `/${view}/${selectedModule?.id || ''}`;
+    window.history.pushState({ view, moduleId: selectedModule?.id }, '', path);
+  }, [view, selectedModule]);
+
+  useEffect(() => {
+    const handlePopState = (e) => {
+      ignoreUrlSync.current = true;
+      if (e.state && e.state.view) {
+        setView(e.state.view);
+        if (e.state.moduleId) {
+          const mod = modules.find(m => m.id === e.state.moduleId);
+          if (mod) setSelectedModule(mod);
+        } else {
+          setSelectedModule(null);
+        }
+      } else {
+        setView('dashboard');
+        setSelectedModule(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (view === 'quiz') {
+      const handler = (e) => {
+        e.preventDefault();
+        e.returnValue = '';
+      };
+      window.addEventListener('beforeunload', handler);
+      return () => window.removeEventListener('beforeunload', handler);
+    }
+  }, [view]);
+
+  useEffect(() => {
+    if (view !== 'quiz') return;
+    saveProgress({
+      moduleId: selectedModule?.id,
+      view,
+      answers,
+      currentQ,
+      score,
+      retryMode,
+      retryQuestions,
+      retryScore
+    });
+  }, [view, answers, currentQ, score, retryMode, retryQuestions, retryScore]);
 
   const startQuiz = (module) => {
+    clearProgress();
     setSelectedModule(module);
     setAnswers([]);
     setCurrentQ(0);
@@ -26,10 +123,32 @@ export default function App() {
     setView('quiz');
   };
 
+  const continueQuiz = () => {
+    const progress = loadProgress();
+    if (!progress) return;
+    const mod = modules.find(m => m.id === progress.moduleId);
+    if (!mod) return;
+    setSelectedModule(mod);
+    setView('quiz');
+    setAnswers(progress.answers || []);
+    setCurrentQ(progress.currentQ || 0);
+    setScore(progress.score || 0);
+    setRetryMode(progress.retryMode || false);
+    setRetryQuestions(progress.retryQuestions || []);
+    setRetryScore(progress.retryScore || 0);
+    setSelectedAnswer(null);
+    setShowFeedback(false);
+  };
+
+  const discardProgress = () => {
+    clearProgress();
+    setSelectedModule(null);
+    setView('dashboard');
+  };
+
   const handleAnswer = (option) => {
     setSelectedAnswer(option);
     setShowFeedback(true);
-
     const questions = retryMode ? retryQuestions : selectedModule.quiz;
     if (option === questions[currentQ].answer) {
       if (retryMode) {
@@ -54,10 +173,10 @@ export default function App() {
     setAnswers(newAnswers);
     setSelectedAnswer(null);
     setShowFeedback(false);
-
     if (currentQ < questions.length - 1) {
       setCurrentQ(currentQ + 1);
     } else {
+      clearProgress();
       setView('result');
       setRetryMode(false);
     }
@@ -84,17 +203,33 @@ export default function App() {
     setView('quiz');
   };
 
+  const retryFullQuiz = () => {
+    clearProgress();
+    setAnswers([]);
+    setCurrentQ(0);
+    setScore(0);
+    setSelectedAnswer(null);
+    setShowFeedback(false);
+    setRetryMode(false);
+    setRetryQuestions([]);
+    setRetryScore(0);
+    setView('quiz');
+  };
+
   const generateProblem = () => {
     setView('problem');
   };
 
   const resetToDashboard = () => {
+    clearProgress();
     setSelectedModule(null);
     setView('dashboard');
   };
 
   // --- DASHBOARD VIEW ---
   if (view === 'dashboard') {
+    const currentProgress = loadProgress();
+
     return (
       <div className="min-h-screen p-8 max-w-5xl mx-auto">
         <header className="border-b-2 border-42accent pb-4 mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -115,6 +250,28 @@ export default function App() {
             <span className="font-mono text-sm hidden md:inline">SegMind25/1337Quizer</span>
           </a>
         </header>
+
+        {currentProgress && currentProgress.view === 'quiz' && (
+          <div className="mb-6 p-4 bg-42pass/10 border border-42pass">
+            <p className="text-42pass font-bold mb-2">
+              You have an in-progress evaluation for {currentProgress.moduleId} (Question {currentProgress.currentQ + 1})
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={continueQuiz}
+                className="bg-42pass text-black px-6 py-2 font-bold hover:bg-white transition-colors"
+              >
+                CONTINUE EVALUATION
+              </button>
+              <button
+                onClick={discardProgress}
+                className="border border-gray-700 text-gray-400 px-6 py-2 hover:bg-gray-800 transition-all"
+              >
+                DISCARD PROGRESS
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="mb-8">
           <h2 className="text-xl text-white mb-4">Available Projects:</h2>
@@ -205,7 +362,18 @@ export default function App() {
               </button>
             </div>
           )}
+
+          <button
+            onClick={resetToDashboard}
+            className="mt-4 text-gray-500 text-sm hover:text-gray-300 transition-colors"
+          >
+            EXIT EVALUATION
+          </button>
         </div>
+
+        <p className="text-gray-600 text-xs text-center mt-4">
+          Your progress is automatically saved. You can safely close or refresh the page.
+        </p>
       </div>
     );
   }
@@ -260,6 +428,13 @@ export default function App() {
               RETRY WRONG ANSWERS ({wrongCount})
             </button>
           )}
+
+          <button
+            onClick={retryFullQuiz}
+            className="w-full bg-purple-600 text-black p-4 font-bold hover:bg-purple-500 transition-colors mb-4"
+          >
+            RETRY FULL QUIZ
+          </button>
 
           {passed && (
             <button
