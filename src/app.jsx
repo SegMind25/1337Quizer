@@ -9,6 +9,9 @@ export default function App() {
   const [score, setScore] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [retryMode, setRetryMode] = useState(false);
+  const [retryQuestions, setRetryQuestions] = useState([]);
+  const [retryScore, setRetryScore] = useState(0);
 
   const startQuiz = (module) => {
     setSelectedModule(module);
@@ -17,6 +20,9 @@ export default function App() {
     setScore(0);
     setSelectedAnswer(null);
     setShowFeedback(false);
+    setRetryMode(false);
+    setRetryQuestions([]);
+    setRetryScore(0);
     setView('quiz');
   };
 
@@ -24,22 +30,58 @@ export default function App() {
     setSelectedAnswer(option);
     setShowFeedback(true);
 
-    if (option === selectedModule.quiz[currentQ].answer) {
-      setScore(score + 1);
+    const questions = retryMode ? retryQuestions : selectedModule.quiz;
+    if (option === questions[currentQ].answer) {
+      if (retryMode) {
+        setRetryScore(retryScore + 1);
+      } else {
+        setScore(score + 1);
+      }
     }
   };
 
   const nextQuestion = () => {
-    const newAnswers = [...answers, selectedAnswer];
+    const questions = retryMode ? retryQuestions : selectedModule.quiz;
+    const question = questions[currentQ];
+    const isCorrect = selectedAnswer === question.answer;
+    const newAnswers = [...answers, {
+      question: question.q,
+      options: question.options,
+      selectedAnswer,
+      correctAnswer: question.answer,
+      isCorrect
+    }];
     setAnswers(newAnswers);
     setSelectedAnswer(null);
     setShowFeedback(false);
 
-    if (currentQ < selectedModule.quiz.length - 1) {
+    if (currentQ < questions.length - 1) {
       setCurrentQ(currentQ + 1);
     } else {
       setView('result');
+      setRetryMode(false);
     }
+  };
+
+  const reviewMistakes = () => {
+    setView('review');
+  };
+
+  const retryWrongAnswers = () => {
+    const wrong = answers.filter(a => !a.isCorrect).map(a => ({
+      q: a.question,
+      options: a.options,
+      answer: a.correctAnswer
+    }));
+    if (wrong.length === 0) return;
+    setRetryQuestions(wrong);
+    setRetryMode(true);
+    setCurrentQ(0);
+    setAnswers([]);
+    setRetryScore(0);
+    setSelectedAnswer(null);
+    setShowFeedback(false);
+    setView('quiz');
   };
 
   const generateProblem = () => {
@@ -60,11 +102,10 @@ export default function App() {
             <h1 className="text-3xl font-bold text-42accent">42 PISCINE - MOULINETTE TESTER</h1>
             <p className="text-42text mt-2">Subject: C Piscine @ 42 | {modules.reduce((acc, m) => acc + m.quiz.length, 0)}+ Expert Questions</p>
           </div>
-          
-          {/* GitHub Link */}
-          <a 
-            href="https://github.com/SegMind25/1337Quizer" 
-            target="_blank" 
+
+          <a
+            href="https://github.com/SegMind25/1337Quizer"
+            target="_blank"
             rel="noopener noreferrer"
             className="text-gray-400 hover:text-42accent transition-colors flex items-center gap-2 self-start md:self-auto"
           >
@@ -74,7 +115,7 @@ export default function App() {
             <span className="font-mono text-sm hidden md:inline">SegMind25/1337Quizer</span>
           </a>
         </header>
-        
+
         <div className="mb-8">
           <h2 className="text-xl text-white mb-4">Available Projects:</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -83,7 +124,7 @@ export default function App() {
                 <h3 className="text-42accent font-bold mb-2">{mod.id}</h3>
                 <p className="text-sm text-gray-400 mb-2 flex-grow">{mod.name}</p>
                 <span className="text-xs text-gray-500 mb-4">{mod.quiz.length} Questions</span>
-                <button 
+                <button
                   onClick={() => startQuiz(mod)}
                   className="bg-42accent text-black px-4 py-2 font-bold hover:bg-white transition-colors w-full mt-auto"
                 >
@@ -99,8 +140,9 @@ export default function App() {
 
   // --- QUIZ VIEW ---
   if (view === 'quiz') {
-    const question = selectedModule.quiz[currentQ];
-    const progress = ((currentQ + 1) / selectedModule.quiz.length) * 100;
+    const questions = retryMode ? retryQuestions : selectedModule.quiz;
+    const question = questions[currentQ];
+    const progress = ((currentQ + 1) / questions.length) * 100;
     const isCorrect = selectedAnswer === question.answer;
 
     const getOptionStyle = (opt) => {
@@ -114,19 +156,27 @@ export default function App() {
       <div className="min-h-screen p-8 max-w-3xl mx-auto flex flex-col justify-center">
         <div className="border border-gray-700 p-8 bg-42bg shadow-lg">
           <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-4">
-            <span className="text-42accent font-bold">{selectedModule.id} - EVALUATION</span>
-            <span className="text-gray-400">Question {currentQ + 1}/{selectedModule.quiz.length}</span>
+            <span className="text-42accent font-bold">
+              {retryMode ? `${selectedModule.id} - RETRY WRONG ANSWERS` : `${selectedModule.id} - EVALUATION`}
+            </span>
+            <span className="text-gray-400">Question {currentQ + 1}/{questions.length}</span>
           </div>
-          
+
           <div className="w-full bg-gray-800 h-1 mb-8">
             <div className="bg-42accent h-1 transition-all duration-300" style={{ width: `${progress}%` }}></div>
           </div>
 
+          {retryMode && (
+            <div className="mb-4 p-2 bg-yellow-900/30 border border-yellow-700 text-yellow-400 text-sm">
+              Retrying {questions.length} incorrect question{questions.length > 1 ? 's' : ''}
+            </div>
+          )}
+
           <h2 className="text-xl text-white mb-8">{question.q}</h2>
-          
+
           <div className="flex flex-col gap-4">
             {question.options.map((opt, idx) => (
-              <button 
+              <button
                 key={idx}
                 onClick={() => !showFeedback && handleAnswer(opt)}
                 disabled={showFeedback}
@@ -151,7 +201,7 @@ export default function App() {
                 onClick={nextQuestion}
                 className="mt-4 bg-42accent text-black px-6 py-2 font-bold hover:bg-white transition-colors"
               >
-                {currentQ < selectedModule.quiz.length - 1 ? 'NEXT QUESTION' : 'SEE RESULTS'}
+                {currentQ < questions.length - 1 ? 'NEXT QUESTION' : 'SEE RESULTS'}
               </button>
             </div>
           )}
@@ -162,9 +212,12 @@ export default function App() {
 
   // --- RESULT VIEW ---
   if (view === 'result') {
-    const percentage = Math.round((score / selectedModule.quiz.length) * 100);
+    const totalQuestions = retryMode ? answers.length : selectedModule.quiz.length;
+    const correctCount = retryMode ? answers.filter(a => a.isCorrect).length : score;
+    const wrongCount = answers.filter(a => !a.isCorrect).length;
+    const percentage = Math.round((correctCount / totalQuestions) * 100);
     const passed = percentage >= 50;
-    
+
     return (
       <div className="min-h-screen p-8 max-w-3xl mx-auto flex flex-col justify-center">
         <div className={`border-2 p-8 bg-42bg shadow-lg ${passed ? 'border-42pass' : 'border-42fail'}`}>
@@ -180,23 +233,106 @@ export default function App() {
 
           <div className="bg-gray-900 p-4 mb-6 border border-gray-700">
             <p className="text-gray-400">Score Details:</p>
-            <p className="text-white">Correct answers: {score} / {selectedModule.quiz.length}</p>
+            <p className="text-white">Correct answers: {correctCount} / {totalQuestions}</p>
+            <p className="text-white">Wrong answers: {wrongCount}</p>
             <p className="text-white">Threshold: 50%</p>
+            {wrongCount > 0 && (
+              <p className="text-42fail mt-2">
+                Faults: {wrongCount} error{wrongCount > 1 ? 's' : ''} detected
+              </p>
+            )}
           </div>
 
-          <button 
-            onClick={generateProblem}
-            className="w-full bg-42accent text-black p-4 font-bold hover:bg-white transition-colors mb-4"
-          >
-            CLAIM RANDOM EXAM PROBLEM
-          </button>
-          
-          <button 
+          {wrongCount > 0 && (
+            <button
+              onClick={reviewMistakes}
+              className="w-full bg-yellow-600 text-black p-4 font-bold hover:bg-yellow-500 transition-colors mb-4"
+            >
+              REVIEW MISTAKES ({wrongCount})
+            </button>
+          )}
+
+          {wrongCount > 0 && (
+            <button
+              onClick={retryWrongAnswers}
+              className="w-full bg-orange-600 text-black p-4 font-bold hover:bg-orange-500 transition-colors mb-4"
+            >
+              RETRY WRONG ANSWERS ({wrongCount})
+            </button>
+          )}
+
+          {passed && (
+            <button
+              onClick={generateProblem}
+              className="w-full bg-42accent text-black p-4 font-bold hover:bg-white transition-colors mb-4"
+            >
+              CLAIM RANDOM EXAM PROBLEM
+            </button>
+          )}
+
+          <button
             onClick={resetToDashboard}
             className="w-full border border-gray-700 text-gray-400 p-4 hover:bg-gray-800 transition-all"
           >
             BACK TO DASHBOARD
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- REVIEW MISTAKES VIEW ---
+  if (view === 'review') {
+    const wrongAnswers = answers.filter(a => !a.isCorrect);
+
+    return (
+      <div className="min-h-screen p-8 max-w-3xl mx-auto">
+        <div className="border border-gray-700 p-8 bg-42bg">
+          <div className="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
+            <span className="text-42fail font-bold">FAULT REPORT - {selectedModule.id}</span>
+            <span className="text-gray-400">{wrongAnswers.length} error{wrongAnswers.length > 1 ? 's' : ''}</span>
+          </div>
+
+          <div className="mb-6 bg-gray-900 p-4 border border-gray-700">
+            <p className="text-gray-400">Summary:</p>
+            <p className="text-white">You answered <span className="text-42pass">{answers.filter(a => a.isCorrect).length}</span> correctly and <span className="text-42fail">{wrongAnswers.length}</span> incorrectly out of {answers.length} questions.</p>
+          </div>
+
+          <div className="flex flex-col gap-4 mb-6">
+            {wrongAnswers.map((item, idx) => (
+              <div key={idx} className="border border-42fail bg-gray-900 p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-42fail font-bold text-sm">FAULT #{idx + 1}</span>
+                </div>
+                <p className="text-white mb-4">{item.question}</p>
+                <div className="flex flex-col gap-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 w-20 shrink-0">Your answer:</span>
+                    <span className="text-42fail line-through">{item.selectedAnswer}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 w-20 shrink-0">Correct:</span>
+                    <span className="text-42pass font-bold">{item.correctAnswer}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-4">
+            <button
+              onClick={retryWrongAnswers}
+              className="flex-1 bg-orange-600 text-black p-4 font-bold hover:bg-orange-500 transition-colors"
+            >
+              RETRY WRONG ANSWERS ({wrongAnswers.length})
+            </button>
+            <button
+              onClick={() => setView('result')}
+              className="flex-1 border border-gray-700 text-gray-400 p-4 hover:bg-gray-800 transition-all"
+            >
+              BACK TO RESULTS
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -228,19 +364,19 @@ export default function App() {
           </div>
 
           <div className="flex flex-col gap-4">
-            <textarea 
+            <textarea
               className="w-full h-48 bg-black border border-gray-700 p-4 text-42text font-mono focus:outline-none focus:border-42accent"
               placeholder="// Write your C code here..."
             ></textarea>
-            
+
             <div className="flex gap-4">
-              <button 
+              <button
                 onClick={() => alert('Compiling with: cc -Wall -Wextra -Werror...\n\nNorminette check...\n\n(In a real environment, your code would be tested here.)')}
                 className="flex-1 bg-42accent text-black p-4 font-bold hover:bg-white transition-colors"
               >
                 COMPILE & TEST
               </button>
-              <button 
+              <button
                 onClick={resetToDashboard}
                 className="flex-1 border border-gray-700 text-gray-400 p-4 hover:bg-gray-800 transition-all"
               >
