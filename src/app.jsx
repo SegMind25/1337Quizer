@@ -1,28 +1,39 @@
 import React, { useState } from 'react';
-import { modules } from './data.js'; // Import the massive database
+import { modules } from './data.js';
 
 export default function App() {
   const [selectedModule, setSelectedModule] = useState(null);
-  const [view, setView] = useState('dashboard'); // dashboard, quiz, result, problem
+  const [view, setView] = useState('dashboard');
   const [answers, setAnswers] = useState([]);
   const [currentQ, setCurrentQ] = useState(0);
   const [score, setScore] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const startQuiz = (module) => {
     setSelectedModule(module);
     setAnswers([]);
     setCurrentQ(0);
     setScore(0);
+    setSelectedAnswer(null);
+    setShowFeedback(false);
     setView('quiz');
   };
 
   const handleAnswer = (option) => {
-    const newAnswers = [...answers, option];
-    setAnswers(newAnswers);
+    setSelectedAnswer(option);
+    setShowFeedback(true);
 
     if (option === selectedModule.quiz[currentQ].answer) {
       setScore(score + 1);
     }
+  };
+
+  const nextQuestion = () => {
+    const newAnswers = [...answers, selectedAnswer];
+    setAnswers(newAnswers);
+    setSelectedAnswer(null);
+    setShowFeedback(false);
 
     if (currentQ < selectedModule.quiz.length - 1) {
       setCurrentQ(currentQ + 1);
@@ -90,7 +101,15 @@ export default function App() {
   if (view === 'quiz') {
     const question = selectedModule.quiz[currentQ];
     const progress = ((currentQ + 1) / selectedModule.quiz.length) * 100;
-    
+    const isCorrect = selectedAnswer === question.answer;
+
+    const getOptionStyle = (opt) => {
+      if (!showFeedback) return 'border-gray-700 hover:border-42accent hover:bg-gray-800';
+      if (opt === question.answer) return 'border-42pass bg-gray-800 text-42pass';
+      if (opt === selectedAnswer && !isCorrect) return 'border-42fail bg-gray-800 text-42fail';
+      return 'border-gray-700 opacity-50';
+    };
+
     return (
       <div className="min-h-screen p-8 max-w-3xl mx-auto flex flex-col justify-center">
         <div className="border border-gray-700 p-8 bg-42bg shadow-lg">
@@ -99,7 +118,6 @@ export default function App() {
             <span className="text-gray-400">Question {currentQ + 1}/{selectedModule.quiz.length}</span>
           </div>
           
-          {/* Progress Bar */}
           <div className="w-full bg-gray-800 h-1 mb-8">
             <div className="bg-42accent h-1 transition-all duration-300" style={{ width: `${progress}%` }}></div>
           </div>
@@ -110,13 +128,33 @@ export default function App() {
             {question.options.map((opt, idx) => (
               <button 
                 key={idx}
-                onClick={() => handleAnswer(opt)}
-                className="text-left p-4 border border-gray-700 hover:border-42accent hover:bg-gray-800 transition-all text-42text"
+                onClick={() => !showFeedback && handleAnswer(opt)}
+                disabled={showFeedback}
+                className={`text-left p-4 border transition-all text-42text ${getOptionStyle(opt)}`}
               >
-                <span className="text-42accent mr-2">[{String.fromCharCode(97 + idx)}]</span> {opt}
+                <span className="mr-2">[{String.fromCharCode(97 + idx)}]</span> {opt}
               </button>
             ))}
           </div>
+
+          {showFeedback && (
+            <div className={`mt-6 p-4 border ${isCorrect ? 'border-42pass bg-gray-900' : 'border-42fail bg-gray-900'}`}>
+              <p className={`font-bold ${isCorrect ? 'text-42pass' : 'text-42fail'}`}>
+                {isCorrect ? 'CORRECT!' : 'WRONG!'}
+              </p>
+              {!isCorrect && (
+                <p className="text-42pass mt-2">
+                  Correct answer: <span className="font-bold">{question.answer}</span>
+                </p>
+              )}
+              <button
+                onClick={nextQuestion}
+                className="mt-4 bg-42accent text-black px-6 py-2 font-bold hover:bg-white transition-colors"
+              >
+                {currentQ < selectedModule.quiz.length - 1 ? 'NEXT QUESTION' : 'SEE RESULTS'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
