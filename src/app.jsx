@@ -350,7 +350,7 @@ export default function App() {
 
           <div className="bg-gray-900 p-6 border border-gray-700 mb-6">
             <p className="text-42text text-lg whitespace-pre-wrap">
-              <span className="text-42accent">$> </span>
+              <span className="text-42accent">{'$> '}</span>
               {selectedModule.problem}
             </p>
           </div>
