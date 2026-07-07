@@ -40,6 +40,7 @@ export default function App() {
   const [retryMode, setRetryMode] = useState(saved?.retryMode || false);
   const [retryQuestions, setRetryQuestions] = useState(saved?.retryQuestions || []);
   const [retryScore, setRetryScore] = useState(saved?.retryScore || 0);
+  const [tick, setTick] = useState(0);
   const ignoreUrlSync = useRef(false);
   const synced = useRef(false);
 
@@ -138,12 +139,13 @@ export default function App() {
     setRetryScore(progress.retryScore || 0);
     setSelectedAnswer(null);
     setShowFeedback(false);
+    setTick(t => t + 1);
   };
 
   const discardProgress = () => {
     clearProgress();
     setSelectedModule(null);
-    setView('dashboard');
+    setTick(t => t + 1);
   };
 
   const handleAnswer = (option) => {
