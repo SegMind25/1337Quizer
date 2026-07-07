@@ -22,24 +22,17 @@ function clearProgress() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-const saved = loadProgress();
-
 export default function App() {
-  const [selectedModule, setSelectedModule] = useState(() => {
-    if (saved && saved.moduleId) {
-      return modules.find(m => m.id === saved.moduleId) || null;
-    }
-    return null;
-  });
-  const [view, setView] = useState(saved?.view || 'dashboard');
-  const [answers, setAnswers] = useState(saved?.answers || []);
-  const [currentQ, setCurrentQ] = useState(saved?.currentQ || 0);
-  const [score, setScore] = useState(saved?.score || 0);
+  const [selectedModule, setSelectedModule] = useState(null);
+  const [view, setView] = useState('dashboard');
+  const [answers, setAnswers] = useState([]);
+  const [currentQ, setCurrentQ] = useState(0);
+  const [score, setScore] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [retryMode, setRetryMode] = useState(saved?.retryMode || false);
-  const [retryQuestions, setRetryQuestions] = useState(saved?.retryQuestions || []);
-  const [retryScore, setRetryScore] = useState(saved?.retryScore || 0);
+  const [retryMode, setRetryMode] = useState(false);
+  const [retryQuestions, setRetryQuestions] = useState([]);
+  const [retryScore, setRetryScore] = useState(0);
   const [tick, setTick] = useState(0);
   const ignoreUrlSync = useRef(false);
   const synced = useRef(false);
